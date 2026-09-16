@@ -591,6 +591,8 @@ defineExpose({
 <style scoped>
 .inline {
     display: inline-block;
+    flex: 0 0 auto;
+    max-width: none;
     width: auto;
     float: none;
 }

@@ -133,6 +133,8 @@ defineExpose({
 }
 
 .search-form__inner :deep(.el-input),
+.search-form__inner :deep(.el-select),
+.search-form__inner :deep(.el-input-number),
 .search-form__inner :deep(.el-date-editor) {
   width: 100%;
 }

@@ -1,0 +1,86 @@
+:root {
+  color: #172033;
+  background: #f5f7fa;
+  font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  --app-sidebar-width: 224px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+button, input, textarea, select { font: inherit; }
+
+.app-shell {
+  display: grid;
+  grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid #e3e8ef;
+  background: #fff;
+}
+
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 78px;
+  padding: 16px 24px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.app-brand__mark {
+  display: grid;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  color: #fff;
+  background: #275efe;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.app-brand strong, .app-brand span { display: block; }
+.app-brand strong { color: #172033; font-size: 15px; line-height: 20px; }
+.app-brand div > span { color: #8a94a6; font-size: 12px; line-height: 18px; }
+
+.app-content {
+  min-width: 0;
+  padding: 28px 32px 40px;
+}
+
+@media (max-width: 760px) {
+  .app-shell { display: block; }
+  .app-sidebar {
+    position: static;
+    width: 100%;
+    height: auto;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid #e3e8ef;
+  }
+  .app-brand { min-height: 64px; }
+  .app-sidebar .example-menu {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 10px 16px;
+  }
+  .app-sidebar .example-menu__title { display: none; }
+  .app-sidebar .example-menu__link { flex: 0 0 auto; margin: 0; }
+  .app-content { padding: 20px 16px 32px; }
+}

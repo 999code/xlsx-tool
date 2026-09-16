@@ -29,7 +29,7 @@ importers:
         version: 9.39.1
       '@vitejs/plugin-vue':
         specifier: 5.2.4
-        version: 5.2.4(vite@6.4.1(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1))(vue@3.5.22)
+        version: 5.2.4(vite@6.4.3(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1))(vue@3.5.22)
       '@vue/compiler-sfc':
         specifier: 3.5.22
         version: 3.5.22
@@ -46,8 +46,8 @@ importers:
         specifier: ^1.104.1
         version: 1.104.1
       vite:
-        specifier: 6.4.1
-        version: 6.4.1(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1)
+        specifier: 6.4.3
+        version: 6.4.3(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1)
 
 packages:
 
@@ -1141,8 +1141,8 @@ packages:
   varint@6.0.0:
     resolution: {integrity: sha512-cXEIW6cfr15lFv563k4GuVuW/fiwjknytD37jIOLSdSWuOI6WnO/oKwmP2FQTU2l01LP8/M5TSAJpzUaGe3uWg==}
 
-  vite@6.4.1:
-    resolution: {integrity: sha512-+Oxm7q9hDoLMyJOYfUYBuHQo+dkAloi33apOPP56pzj+vsdJDzr+j1NISE5pyaAuKL4A3UD34qd0lx5+kfKp2g==}
+  vite@6.4.3:
+    resolution: {integrity: sha512-NTKlcQjlAK7MlQoyb6LgaqHc8sso/pVyUJYWMws3jg21uTJw/LddqIFPcPqP6PzpgbIcZyKI85sFE4HBrQDA8A==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
@@ -1558,9 +1558,9 @@ snapshots:
 
   '@types/web-bluetooth@0.0.20': {}
 
-  '@vitejs/plugin-vue@5.2.4(vite@6.4.1(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1))(vue@3.5.22)':
+  '@vitejs/plugin-vue@5.2.4(vite@6.4.3(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1))(vue@3.5.22)':
     dependencies:
-      vite: 6.4.1(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1)
+      vite: 6.4.3(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1)
       vue: 3.5.22
 
   '@vue/compiler-core@3.5.22':
@@ -2210,7 +2210,7 @@ snapshots:
 
   varint@6.0.0: {}
 
-  vite@6.4.1(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1):
+  vite@6.4.3(@types/node@26.4.1)(sass-embedded@1.104.1)(sass@1.104.1):
     dependencies:
       esbuild: 0.25.12
       fdir: 6.5.0(picomatch@4.0.7)
