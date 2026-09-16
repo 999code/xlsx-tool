@@ -1,6 +1,5 @@
 <template>
   <nav class="example-menu" aria-label="示例页面">
-    <p class="example-menu__title"></p>
     <router-link
       v-for="item in items"
       :key="item.path"
