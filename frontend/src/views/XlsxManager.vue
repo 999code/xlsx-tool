@@ -160,7 +160,7 @@ const tableSetting = {
 };
 
 const searchSchema = computed(() => ({
-  colSpan: 8,
+  colSpan: 6,
   gutter: 16,
   model: query,
   formItems: [
