@@ -2,7 +2,6 @@
   <section class="xlsx-page" aria-labelledby="xlsx-page-title">
     <header class="xlsx-header">
       <div>
-        <p class="xlsx-eyebrow">本地工作簿</p>
         <h1 id="xlsx-page-title">XLSX 数据管理</h1>
         <p class="xlsx-description">
           将 Excel 工作表作为轻量数据源，通过 Node.js API 完成查询、新增、修改与删除。
@@ -20,6 +19,34 @@
       closable
       @close="errorMessage = ''"
     />
+
+    <section
+      class="xlsx-workbook-switcher"
+      aria-labelledby="xlsx-workbook-switcher-title"
+      v-loading="loadingWorkbooks"
+    >
+      <div class="xlsx-workbook-switcher__heading">
+        <h2 id="xlsx-workbook-switcher-title">Excel 文件</h2>
+        <p>{{ workbooks.length }} 个可用工作簿</p>
+      </div>
+      <el-tabs
+        v-if="workbooks.length"
+        v-model="activeWorkbook"
+        class="xlsx-workbook-tabs"
+        @tab-change="handleWorkbookChange"
+      >
+        <el-tab-pane
+          v-for="workbook in workbooks"
+          :key="workbook.fileName"
+          :name="workbook.fileName"
+        >
+          <template #label>
+            <span class="xlsx-workbook-tab" :title="workbook.fileName">{{ workbook.fileName }}</span>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
+      <el-empty v-else :image-size="56" description="目录中没有可用的 .xlsx 文件" />
+    </section>
 
     <div class="xlsx-metrics" aria-label="工作簿概况">
       <div class="xlsx-metric"><span>当前文件</span><strong>{{ metadata?.fileName || '正在读取…' }}</strong></div>
@@ -52,11 +79,11 @@
       <div class="table-header">
         <div class="table-header__left">
           <el-button type="primary" :disabled="!activeSheet" @click="openCreate">新增记录</el-button>
-          <el-button tag="a" href="/api/workbook/download">下载 XLSX</el-button>
+          <el-button tag="a" :href="downloadUrl" :disabled="!activeWorkbook">下载 XLSX</el-button>
           <el-button @click="jsonDrawerVisible = true">查看 JSON</el-button>
         </div>
         <div class="table-header__right">
-          <el-button :loading="loadingMetadata" @click="loadMetadata">刷新结构</el-button>
+          <el-button :loading="loadingWorkbooks || loadingMetadata" @click="loadWorkbooks">刷新文件</el-button>
           <el-button :loading="loadingRecords" @click="loadRecords">刷新数据</el-button>
         </div>
       </div>
@@ -127,8 +154,11 @@ import SearchForm from '../components/SearchForm.vue';
 defineOptions({ name: 'XlsxManager' });
 
 const metadata = ref(null);
+const workbooks = ref([]);
+const activeWorkbook = ref('');
 const columns = ref([]);
 const records = ref([]);
+const loadingWorkbooks = ref(false);
 const loadingMetadata = ref(false);
 const loadingRecords = ref(false);
 const saving = ref(false);
@@ -142,6 +172,10 @@ const query = reactive({ sheet: '', keyword: '' });
 const recordModel = reactive({});
 const pagination = reactive({ page: 1, pageSize: 20, total: 0, totalPages: 1 });
 const activeSheet = computed(() => query.sheet);
+const downloadUrl = computed(() => api.getWorkbookDownloadUrl(activeWorkbook.value));
+let workbookRequestId = 0;
+let metadataRequestId = 0;
+let recordsRequestId = 0;
 
 const recordFormSetting = {
   form: { labelPosition: 'top', size: 'default', class: 'xlsx-record-form' },
@@ -202,6 +236,8 @@ const recordSchema = computed(() => ({
 const jsonPreview = computed(() => JSON.stringify({
   success: true,
   data: {
+    workbook: activeWorkbook.value,
+    sheet: activeSheet.value,
     records: records.value,
     columns: columns.value,
     pagination: { ...pagination },
@@ -227,41 +263,92 @@ function clearRecordModel(source = {}) {
   });
 }
 
+function resetWorkbookState() {
+  metadata.value = null;
+  query.sheet = '';
+  query.keyword = '';
+  records.value = [];
+  columns.value = [];
+  Object.assign(pagination, { page: 1, total: 0, totalPages: 1 });
+}
+
+async function loadWorkbooks() {
+  const requestId = ++workbookRequestId;
+  loadingWorkbooks.value = true;
+  errorMessage.value = '';
+  try {
+    const response = await api.getWorkbooks();
+    if (requestId !== workbookRequestId) return;
+    workbooks.value = response.data.workbooks;
+    const availableNames = new Set(workbooks.value.map((workbook) => workbook.fileName));
+    if (!availableNames.has(activeWorkbook.value)) {
+      activeWorkbook.value = response.data.defaultFileName || workbooks.value[0]?.fileName || '';
+      resetWorkbookState();
+    }
+    if (activeWorkbook.value) await loadMetadata();
+  } catch (error) {
+    if (requestId === workbookRequestId) errorMessage.value = error.message;
+  } finally {
+    if (requestId === workbookRequestId) loadingWorkbooks.value = false;
+  }
+}
+
 async function loadMetadata() {
+  const workbookName = activeWorkbook.value;
+  if (!workbookName) return;
+  const requestId = ++metadataRequestId;
   loadingMetadata.value = true;
   errorMessage.value = '';
   try {
-    const response = await api.getWorkbook();
+    const response = await api.getWorkbook(workbookName);
+    if (requestId !== metadataRequestId || activeWorkbook.value !== workbookName) return;
     metadata.value = response.data;
     if (!query.sheet || !response.data.sheets.some((sheet) => sheet.name === query.sheet)) {
       query.sheet = response.data.sheets[0]?.name || '';
     }
     await loadRecords();
   } catch (error) {
-    errorMessage.value = error.message;
+    if (requestId === metadataRequestId) errorMessage.value = error.message;
   } finally {
-    loadingMetadata.value = false;
+    if (requestId === metadataRequestId) loadingMetadata.value = false;
   }
 }
 
 async function loadRecords() {
-  if (!query.sheet) return;
+  const workbookName = activeWorkbook.value;
+  const sheetName = query.sheet;
+  if (!workbookName || !sheetName) return;
+  const requestId = ++recordsRequestId;
   loadingRecords.value = true;
   errorMessage.value = '';
   try {
-    const response = await api.getRecords(query.sheet, {
+    const response = await api.getRecords(workbookName, sheetName, {
       page: pagination.page,
       pageSize: pagination.pageSize,
       search: query.keyword.trim(),
     });
+    if (
+      requestId !== recordsRequestId
+      || activeWorkbook.value !== workbookName
+      || query.sheet !== sheetName
+    ) return;
     records.value = response.data.records;
     columns.value = response.data.columns;
     Object.assign(pagination, response.data.pagination);
   } catch (error) {
-    errorMessage.value = error.message;
+    if (requestId === recordsRequestId) errorMessage.value = error.message;
   } finally {
-    loadingRecords.value = false;
+    if (requestId === recordsRequestId) loadingRecords.value = false;
   }
+}
+
+async function handleWorkbookChange() {
+  metadataRequestId += 1;
+  recordsRequestId += 1;
+  loadingMetadata.value = false;
+  loadingRecords.value = false;
+  resetWorkbookState();
+  await loadMetadata();
 }
 
 function handleSheetChange() {
@@ -294,10 +381,10 @@ async function saveRecord() {
   try {
     const payload = Object.fromEntries(columns.value.map(({ key }) => [key, recordModel[key]]));
     if (editingRowNumber.value) {
-      await api.updateRecord(query.sheet, editingRowNumber.value, payload);
+      await api.updateRecord(activeWorkbook.value, query.sheet, editingRowNumber.value, payload);
       ElMessage.success('记录已保存到 XLSX');
     } else {
-      await api.createRecord(query.sheet, payload);
+      await api.createRecord(activeWorkbook.value, query.sheet, payload);
       ElMessage.success('记录已新增到 XLSX');
     }
     recordDialogVisible.value = false;
@@ -316,7 +403,7 @@ async function removeRecord(row) {
       '删除记录',
       { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' },
     );
-    await api.deleteRecord(query.sheet, row._rowNumber);
+    await api.deleteRecord(activeWorkbook.value, query.sheet, row._rowNumber);
     ElMessage.success('记录已从 XLSX 删除');
     if (records.value.length === 1 && pagination.page > 1) pagination.page -= 1;
     await loadMetadata();
@@ -346,16 +433,33 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
-onMounted(loadMetadata);
+onMounted(loadWorkbooks);
 </script>
 
 <style scoped>
-.xlsx-page { max-width: 1480px; margin: 0 auto; }
+.xlsx-page {
+  max-width: 1480px;
+  margin: 0 auto;
+}
 .xlsx-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
-.xlsx-eyebrow { margin: 0 0 6px; color: #275efe; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+.xlsx-eyebrow { margin: 0 0 6px; color: #217346; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
 .xlsx-header h1 { margin: 0; color: #172033; font-size: clamp(26px, 3vw, 36px); line-height: 1.2; letter-spacing: -.02em; }
 .xlsx-description { max-width: 720px; margin: 10px 0 0; color: #667085; font-size: 14px; line-height: 1.7; }
 .xlsx-alert { margin-bottom: 16px; }
+.xlsx-workbook-switcher { min-height: 96px; margin-bottom: 16px; padding: 14px 20px 0; border: 1px solid #e3e8ef; border-radius: 10px; background: #fff; box-shadow: 0 2px 5px rgb(64 68 82 / 5%), 0 1px 2px rgb(64 68 82 / 4%); }
+.xlsx-workbook-switcher__heading { display: flex; align-items: baseline; gap: 8px; }
+.xlsx-workbook-switcher__heading h2 { margin: 0; color: #344054; font-size: 14px; font-weight: 600; }
+.xlsx-workbook-switcher__heading p { margin: 0; color: #8a94a6; font-size: 12px; font-variant-numeric: tabular-nums; }
+.xlsx-workbook-tabs { margin-top: 4px; }
+.xlsx-workbook-tabs :deep(.el-tabs__header) { margin: 0; }
+.xlsx-workbook-tabs :deep(.el-tabs__content) { display: none; }
+.xlsx-workbook-tabs :deep(.el-tabs__nav-wrap::after) { height: 1px; background-color: #eef1f5; }
+.xlsx-workbook-tabs :deep(.el-tabs__item) { max-width: 280px; height: 44px; padding: 0 18px; color: #667085; }
+.xlsx-workbook-tabs :deep(.el-tabs__item:hover),
+.xlsx-workbook-tabs :deep(.el-tabs__item:focus-visible) { color: #185a37; }
+.xlsx-workbook-tabs :deep(.el-tabs__item.is-active) { color: #185a37; font-weight: 600; }
+.xlsx-workbook-tab { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xlsx-workbook-switcher :deep(.el-empty) { padding: 8px 0 18px; }
 .xlsx-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 16px; overflow: hidden; border: 1px solid #e3e8ef; border-radius: 12px; background: #fff; }
 .xlsx-metric { min-width: 0; padding: 18px 20px; border-right: 1px solid #eef1f5; }
 .xlsx-metric:last-child { border-right: 0; }
@@ -374,7 +478,7 @@ onMounted(loadMetadata);
 .table-header__right { flex: 0 0 auto; margin-left: auto; }
 .table-header :deep(.el-button + .el-button) { margin-left: 0; }
 .xlsx-table-wrap { flex: 1 1 auto; height: auto; min-height: 0; overflow: hidden; }
-.xlsx-table-wrap :deep(.el-table) { height: 100% !important; --el-table-header-bg-color: #f8fafc; --el-table-row-hover-bg-color: #f4f7ff; color: #344054; }
+.xlsx-table-wrap :deep(.el-table) { height: 100% !important; --el-table-header-bg-color: #f8fafc; --el-table-row-hover-bg-color: #f2f8f4; color: #344054; }
 .xlsx-table-wrap :deep(.el-table th.el-table__cell) { height: 46px; color: #667085; font-size: 12px; font-weight: 600; }
 .xlsx-cell { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .xlsx-row-actions { display: flex; justify-content: flex-end; gap: 12px; }

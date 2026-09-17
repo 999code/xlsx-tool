@@ -6,7 +6,7 @@ import test from 'node:test';
 
 import { WorkbookStore } from '../src/workbook-store.js';
 
-const sourceWorkbook = path.resolve('..', 'test.xlsx');
+const sourceWorkbook = path.resolve('..', 'excel', 'test.xlsx');
 
 function sampleValue(column, suffix = '') {
   if (column.type === 'number') return 20260916;

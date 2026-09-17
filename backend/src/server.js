@@ -7,10 +7,10 @@ import morgan from 'morgan';
 
 import { config } from './config.js';
 import { HttpError } from './http-error.js';
-import { WorkbookStore } from './workbook-store.js';
+import { WorkbookCatalog } from './workbook-catalog.js';
 
 const app = express();
-const store = new WorkbookStore(config);
+const catalog = new WorkbookCatalog(config);
 
 app.disable('x-powered-by');
 app.use(cors({ origin: config.corsOrigin.split(',').map((value) => value.trim()) }));
@@ -28,19 +28,29 @@ function parsePositiveInteger(value, fallback, maximum = Number.POSITIVE_INFINIT
 }
 
 app.get('/api/health', asyncRoute(async (_request, response) => {
+  const { store } = await catalog.getSelection();
   const metadata = await store.getMetadata();
   response.json({ success: true, data: { status: 'ok', workbook: metadata.fileName } });
 }));
 
-app.get('/api/workbook', asyncRoute(async (_request, response) => {
+app.get('/api/workbooks', asyncRoute(async (_request, response) => {
+  response.json({ success: true, data: await catalog.list() });
+}));
+
+app.get('/api/workbook', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   response.json({ success: true, data: await store.getMetadata() });
 }));
 
-app.get('/api/workbook/download', (_request, response, next) => {
-  response.download(config.workbookPath, path.basename(config.workbookPath), next);
-});
+app.get('/api/workbook/download', asyncRoute(async (request, response, next) => {
+  const { fileName, filePath } = await catalog.getSelection(request.query.workbook);
+  response.download(filePath, fileName, (error) => {
+    if (error) next(error);
+  });
+}));
 
 app.get('/api/sheets/:sheetName/records', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const page = parsePositiveInteger(request.query.page, 1);
   const pageSize = parsePositiveInteger(request.query.pageSize, 20, 100);
   const data = await store.listRecords(request.params.sheetName, {
@@ -52,28 +62,33 @@ app.get('/api/sheets/:sheetName/records', asyncRoute(async (request, response) =
 }));
 
 app.get('/api/sheets/:sheetName/records/:rowNumber', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const rowNumber = parsePositiveInteger(request.params.rowNumber, 0);
   response.json({ success: true, data: await store.getRecord(request.params.sheetName, rowNumber) });
 }));
 
 app.post('/api/sheets/:sheetName/records', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const data = await store.createRecord(request.params.sheetName, request.body);
   response.status(201).json({ success: true, data, message: '记录已添加到 Excel' });
 }));
 
 app.put('/api/sheets/:sheetName/records/:rowNumber', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const rowNumber = parsePositiveInteger(request.params.rowNumber, 0);
   const data = await store.updateRecord(request.params.sheetName, rowNumber, request.body, { replace: true });
   response.json({ success: true, data, message: '记录已更新' });
 }));
 
 app.patch('/api/sheets/:sheetName/records/:rowNumber', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const rowNumber = parsePositiveInteger(request.params.rowNumber, 0);
   const data = await store.updateRecord(request.params.sheetName, rowNumber, request.body);
   response.json({ success: true, data, message: '记录已更新' });
 }));
 
 app.delete('/api/sheets/:sheetName/records/:rowNumber', asyncRoute(async (request, response) => {
+  const { store } = await catalog.getSelection(request.query.workbook);
   const rowNumber = parsePositiveInteger(request.params.rowNumber, 0);
   const data = await store.deleteRecord(request.params.sheetName, rowNumber);
   response.json({ success: true, data, message: '记录已删除' });
@@ -86,7 +101,8 @@ if (fs.existsSync(frontendDist)) {
   app.get('/{*splat}', (_request, response) => response.sendFile(path.join(frontendDist, 'index.html')));
 }
 
-app.use((error, _request, response, _next) => {
+app.use((error, _request, response, next) => {
+  if (response.headersSent) return next(error);
   const status = error instanceof HttpError ? error.status : 500;
   const message = error instanceof HttpError ? error.message : '服务器处理请求失败';
   if (status >= 500) console.error(error);
@@ -98,5 +114,5 @@ app.use((error, _request, response, _next) => {
 
 app.listen(config.port, () => {
   console.log(`XLSX JSON API running at http://localhost:${config.port}`);
-  console.log(`Workbook: ${config.workbookPath}`);
+  console.log(`Workbook directory: ${config.workbookDirectory}`);
 });
